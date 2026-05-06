@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
-	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -88,16 +88,20 @@ func main() {
 			c.Set("Content-Type", "application/octet-stream")
 		}
 
-		if obj.ContentLength > 0 {
-			c.Set("Content-Length", strconv.FormatInt(obj.ContentLength, 10))
-		}
-
 		if obj.ETag != "" {
 			c.Set("ETag", obj.ETag)
 		}
 
+		data, err := io.ReadAll(obj.Body)
+		if err != nil {
+			log.Printf("failed to read object body key=%s err=%v", key, err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to read file body",
+			})
+		}
+
 		c.Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", utils.SafeFilename(key)))
-		return c.SendStream(obj.Body)
+		return c.Send(data)
 	})
 
 	addr := fmt.Sprintf(":%s", cfg.AppPort)
